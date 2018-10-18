@@ -34,7 +34,6 @@ struct lock filesys_lock;
 
 bool is_valid_ptr(const void *user_ptr);
 
-//enum fd_search_filter { FD_FILE = 1, FD_DIRECTORY = 2 };
 struct file_descriptor * retrieve_file(int fd);
 
 struct file_descriptor{
@@ -43,9 +42,6 @@ struct file_descriptor{
   struct file *file_struct;
   struct list_elem elem;
 };
-
-// struct list open_files;
-struct lock filesys_lock;
 
 void
 syscall_init (void)
@@ -98,32 +94,31 @@ syscall_handler (struct intr_frame *f)
     }
     case SYS_CREATE:
     {
-      is_valid_ptr(esp+5);
-      is_valid_ptr(*(esp+4));
-      lock_acquire();
-      f->eax = filesys_create(*(esp+4), *(esp+5))
-      lock_release();
+      if(!is_valid_ptr(esp+5))
+        sys_exit(-1);
+
+      if(!is_valid_ptr(esp+4))
+        sys_exit(-1);
+
+      if(!is_valid_ptr(*(esp+4)))
+        sys_exit(-1);
+
+      lock_acquire(&filesys_lock);
+      f->eax = filesys_create(*(esp+4), *(esp+5));
+      lock_release(&filesys_lock);
       break;
     }
   case SYS_REMOVE:
     {
-      // TODO
-      // const char* filename;
-      // bool ret;
-      //
-      // lock_acquire (&filesys_lock);
-      // ret = filesys_remove(filename);
-      // lock_release (&filesys_lock);
-      //
-      // f->eax = ret;
-      is_valid_ptr(esp+1);
-      is_valid_ptr(*(esp+1));
-      lock_acquire();
-      if(filesys_remove(*esp+1)) == NULL)
-        f->eax = false;
-        else
-        f->eax = true;
-        lock_release();
+      if(!is_valid_ptr(esp+4))
+        sys_exit(-1);
+
+      if(!is_valid_ptr(*(esp+4)))
+        sys_exit(-1);
+
+      lock_acquire(&filesys_lock);
+      f->eax = filesys_remove(*(esp+1));
+      lock_release(&filesys_lock);
       break;
     }
   case SYS_WRITE:
