@@ -30,8 +30,6 @@ void sys_exit (int);
 void sys_halt(void);
 int sys_exec (const char *cmdline);
 
-struct lock filesys_lock;
-
 bool is_valid_ptr(const void *user_ptr);
 
 struct file_descriptor * retrieve_file(int fd);
