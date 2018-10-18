@@ -34,6 +34,8 @@ int sys_filesize(int fd_num);
 
 struct lock filesys_lock;
 
+struct lock filesys_lock;
+
 bool is_valid_ptr(const void *user_ptr);
 
 struct lock filesys_lock;
@@ -94,17 +96,22 @@ syscall_handler (struct intr_frame *f)
     }
   case SYS_WAIT:
     {
-      while(1); //TODO
+      if(is_valid_ptr((const void*) (esp+1))){//Make sure this check is appropriate
+        f->eax = process_wait(*(esp + 1));//
+      }else{
+        sys_exit(-1);
+      }
+      break;
     }
     case SYS_CREATE:
     {
-      if(!is_valid_ptr((const void*)esp+5))
+      if(!is_valid_ptr((const void*) (esp+5)))
         sys_exit(-1);
 
-      if(!is_valid_ptr((const void*)esp+4))
+      if(!is_valid_ptr((const void*) (esp+4)))
         sys_exit(-1);
 
-      if(!is_valid_ptr((const void*)*(esp+4)))
+      if(!is_valid_ptr((const void*) *(esp+4)))
         sys_exit(-1);
 
       //printf("SYSCALL: SYS_CREATE: filename: %s\n", *(esp+4));
@@ -112,14 +119,15 @@ syscall_handler (struct intr_frame *f)
       lock_acquire(&filesys_lock);
       f->eax = filesys_create((const char*)*(esp+4), (off_t)*(esp+5));
       lock_release(&filesys_lock);
+
       break;
     }
   case SYS_REMOVE:
     {
-      if(!is_valid_ptr((const void*)esp+1))
+      if(!is_valid_ptr((const void*) (esp+4)))
         sys_exit(-1);
 
-      if(!is_valid_ptr((const void*)*(esp+1)))
+      if(!is_valid_ptr((const void*) *(esp+4)))
         sys_exit(-1);
 
       //printf("SYSCALL: SYS_REMOVE: filename: %s\n", *(esp+1));
@@ -338,9 +346,9 @@ bool is_valid_ptr(const void *user_ptr)
     return (pagedir_get_page(curr->pagedir, user_ptr)) != NULL;
   }
   if(user_ptr == NULL){
-    //printf("Pointer is NULL\n");
+    printf("Pointer is NULL\n");
   }else{
-    //printf("Pointer is not user address space\n");
+    printf("Pointer is not user address space\n");
   }
   return false;
 }

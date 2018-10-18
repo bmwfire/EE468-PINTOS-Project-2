@@ -137,8 +137,58 @@ start_process (void *cmdline_)
 int
 process_wait (tid_t child_tid)
 {
-  while(1);
-  return -1;
+  int ret;
+  struct thread *cur;
+  struct child_status *child = NULL;
+  int child_found = 0;
+
+  if(child_tid != TID_ERROR){
+    cur = thread_current();
+    //search through children for children
+    struct list_elem *elem = list_tail(&cur->children);//set the focus to the child at the tail of children
+    do{
+      child = list_entry(elem, struct child_status, elem_child_status);
+      if(child->child_tid == child_tid){//check if the child is the one we want
+        child_found = 1;//flag that the child was found
+        break;//finish while loop so child is not overwritten
+      }
+      elem = list_prev(elem);//since our child was not found, move onto next child
+    }while(elem != list_head(&cur->children));//condition for ensuring a null value is not checked
+
+    if(child_found == 0){//repeat loop for head if child still not found
+      child = list_entry(elem, struct child_status, elem_child_status);
+      if(child->child_tid == child_tid){
+        child_found = 1;
+      }
+    }
+
+    //check if we found the child
+    //return -1 if we didnt find the children
+    if(child_found == 0){
+      return -1;
+    }else{//code for waiting
+        lock_acquire(&cur->child_lock);//acquire lock since editing child
+        while(thread_get_by_id(child_tid) != NULL){//loop when child is alive
+          cond_wait(&cur->child_condition, &cur->child_lock);//release lock, reaquire when signaled by child
+        }
+        //if child hasn't called its exit or has been waited by the same process then return -1
+        if(!child->exited || child->has_been_waited){
+          return -1;
+        }
+        else{
+          //ready the return variable as the child's exit status
+          ret = child->child_exit_status;
+          //mark child as waited
+          child->has_been_waited = true;
+        }
+        lock_release(&cur->child_lock);//release lock since finished editing child
+    }
+
+  }else{
+    return TID_ERROR;//return TID_ERROR since child tid is TID_ERROR
+  }
+
+  return ret;
 }
 
 /* Free the current process's resources. */
