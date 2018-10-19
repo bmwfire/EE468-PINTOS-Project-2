@@ -90,8 +90,9 @@ syscall_handler (struct intr_frame *f)
   case SYS_EXIT:
     {
       //printf("SYSCALL: SYS_EXIT \n");
-      //is_valid_ptr(esp+1);
-      sys_exit((int)esp+1);
+      if(!is_valid_ptr((const void *)(esp + 1)))
+        sys_exit(-1);
+      sys_exit((int)*(esp+1));
       break;
     }
   case SYS_WAIT:
@@ -264,6 +265,7 @@ int sys_open(char * file_name)
   struct file_descriptor * new_thread_file = malloc(sizeof(struct file_descriptor));
   new_thread_file->file_struct = new_file_struct;
   new_thread_file->fd_num = thread_current()->next_fd;
+  new_thread_file->owner = thread_current()->tid;
   thread_current()->next_fd++;
   list_push_back(&thread_current()->open_files, &new_thread_file->elem);
   //printf("sys_open: file found in filesystem. new file_descriptor number: %d \n", new_thread_file->fd_num);
@@ -327,9 +329,44 @@ void sys_halt(void) {
   shutdown_power_off();
 }
 
-void sys_exit(int status) {
+void sys_exit(int exit_status) {
+  struct child_status *child_status;
+  struct thread *curr = thread_current();
+  struct thread *parent_thread = thread_get_by_id(curr->parent_tid);
+
+  printf ("%s: exit(%d)\n", curr->name, exit_status);
+
+  if (parent_thread != NULL)
+   {
+     // iterate through parent's child list to find current thread's entry
+     // to update its status
+     struct list_elem *elem = list_head(&parent_thread->children);
+
+     //first check the head
+     child_status = list_entry(elem, struct child_status, elem_child_status);
+     if (child_status->child_tid == curr->tid)
+     {
+       lock_acquire(&parent_thread->child_lock);
+       child_status->exited = true;
+       child_status->child_exit_status = exit_status;
+       lock_release(&parent_thread->child_lock);
+     }
+
+     //and check the whole list too
+     while((elem = list_next(elem)) != list_tail(&parent_thread->children))
+     {
+       child_status = list_entry(elem, struct child_status, elem_child_status);
+       if (child_status->child_tid == curr->tid)
+       {
+         lock_acquire(&parent_thread->child_lock);
+         child_status->exited = true;
+         child_status->child_exit_status = exit_status;
+         lock_release(&parent_thread->child_lock);
+       }
+     }
+   }
+
   thread_exit();
-  // TODO
 }
 
 /* The kernel must be very careful about doing so, because the user can pass
@@ -346,9 +383,9 @@ bool is_valid_ptr(const void *user_ptr)
     return (pagedir_get_page(curr->pagedir, user_ptr)) != NULL;
   }
   if(user_ptr == NULL){
-    printf("Pointer is NULL\n");
+    //printf("Pointer is NULL\n");
   }else{
-    printf("Pointer is not user address space\n");
+    //printf("Pointer is not user address space\n");
   }
   return false;
 }
@@ -379,7 +416,8 @@ int sys_write(int fd, const void *buffer, unsigned size) {
   return bytes_written;
 }
 
-struct file_descriptor * retrieve_file(int fd){
+struct file_descriptor *
+retrieve_file(int fd){
   struct list_elem *list_element;
   struct file_descriptor *fd_struct;
   for(list_element = list_head(&thread_current()->open_files); list_element != list_tail(&thread_current()->open_files);
@@ -394,4 +432,26 @@ struct file_descriptor * retrieve_file(int fd){
     return fd_struct;
 
   return NULL;
+}
+
+void
+close_thread_files(tid_t tid)
+{
+  struct list_elem *elem;
+  struct list_elem *temp;
+  struct file_descriptor *file_desc;
+
+  elem = list_tail (&(thread_current()->open_files));
+  while ((elem = list_prev (elem)) != list_head (&(thread_current()->open_files)))
+    {
+      temp = list_next(elem);
+      file_desc = list_entry(elem, struct file_descriptor, elem);
+      if (file_desc->owner == tid)
+      {
+        list_remove(elem);
+        file_close(file_desc->file_struct);
+        free(file_desc);
+      }
+      elem = temp;
+    }
 }

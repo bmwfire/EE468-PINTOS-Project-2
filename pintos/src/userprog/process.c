@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -144,12 +145,14 @@ process_wait (tid_t child_tid)
 
   if(child_tid != TID_ERROR){
     cur = thread_current();
+    //printf("process_wait: waiting for thread \n");
     //search through children for children
     struct list_elem *elem = list_tail(&cur->children);//set the focus to the child at the tail of children
     do{
       child = list_entry(elem, struct child_status, elem_child_status);
       if(child->child_tid == child_tid){//check if the child is the one we want
         child_found = 1;//flag that the child was found
+        //printf("process_wait: child found\n");
         break;//finish while loop so child is not overwritten
       }
       elem = list_prev(elem);//since our child was not found, move onto next child
@@ -158,6 +161,7 @@ process_wait (tid_t child_tid)
     if(child_found == 0){//repeat loop for head if child still not found
       child = list_entry(elem, struct child_status, elem_child_status);
       if(child->child_tid == child_tid){
+        //printf("process_wait: child found head\n");
         child_found = 1;
       }
     }
@@ -165,19 +169,23 @@ process_wait (tid_t child_tid)
     //check if we found the child
     //return -1 if we didnt find the children
     if(child_found == 0){
+      //printf("process_wait: your child is missing! \n");
       return -1;
     }else{//code for waiting
         lock_acquire(&cur->child_lock);//acquire lock since editing child
         while(thread_get_by_id(child_tid) != NULL){//loop when child is alive
-          cond_wait(&cur->child_condition, &cur->child_lock);//release lock, reaquire when signaled by child
+          //printf("process_wait: child is still alive (...so needy): wait till it dies \n");
+          cond_wait(&cur->child_condition, &cur->child_lock);//release lock, reacquire when signaled by child
         }
         //if child hasn't called its exit or has been waited by the same process then return -1
         if(!child->exited || child->has_been_waited){
+          //printf("process_wait: either child is not exited or has been waited\n");
           lock_release(&cur->child_lock);//release lock since finished editing child
           return -1;
         }
         else{
           //ready the return variable as the child's exit status
+          //printf("process_wait: child died and its last words were: %d \n", child->child_exit_status);
           ret = child->child_exit_status;
           //mark child as waited
           child->has_been_waited = true;
@@ -186,6 +194,7 @@ process_wait (tid_t child_tid)
     }
 
   }else{
+    //printf("process_wait: TID_ERROR \n");
     return TID_ERROR;//return TID_ERROR since child tid is TID_ERROR
   }
 
@@ -198,6 +207,10 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  struct thread *parent_thread;
+  struct list_elem *elem;
+  struct list_elem *temp;
+  struct child_status *child;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -215,6 +228,34 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  elem = list_begin(&cur->children);
+  while(elem != list_tail(&cur->children))
+  {
+    temp = list_next(elem);
+    child = list_entry(elem, struct child_status, elem_child_status);
+    list_remove(elem);
+    free(child);
+    elem = temp;
+  }
+
+  // // don't forget to free the tail
+  // child = list_entry(elem, struct child_status, elem_child_status);
+  // list_remove(elem);
+  // free(child);
+
+  // close the files that are opened by the current thread
+  close_thread_files(cur->tid);
+
+  parent_thread = thread_get_by_id(cur->parent_tid);
+  if (parent_thread != NULL)
+  { // update status and signal parent
+    lock_acquire(&parent_thread->child_lock);
+    if (parent_thread->child_load == 0)
+      parent_thread->child_load = -1; // this may hapen if exitted mid load
+    cond_signal(&parent_thread->child_condition, &parent_thread->child_lock);
+    lock_release(&parent_thread->child_lock);
+  }
 }
 
 /* Sets up the CPU for running user code in the current
