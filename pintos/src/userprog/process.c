@@ -136,7 +136,7 @@ start_process (void *cmdline_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid)
+process_wait (pid_t child_tid)
 {
   int ret;
   struct thread *cur;
