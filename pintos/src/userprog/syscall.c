@@ -25,12 +25,8 @@
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 
+
 static void syscall_handler (struct intr_frame *);
-void sys_exit (int);
-void sys_halt(void);
-int sys_exec (const char *cmdline);
-int sys_open(char * file);
-int sys_filesize(int fd_num);
 
 struct lock filesys_lock;
 
@@ -166,6 +162,54 @@ syscall_handler (struct intr_frame *f)
       }
       break;
     }
+  case SYS_READ:
+    {
+      //printf("READ: starting syswrite with esp = %d\n", *esp);
+      if(is_valid_ptr((const void*)(esp+5)) && is_valid_ptr( (const void*) (esp+6)) && is_valid_ptr((const void*)(esp+7)))
+      {
+        //printf("WRITE: size = %d\n", *(esp+7));
+        if(is_valid_ptr((const void*)(*(esp+6))) && is_valid_ptr((const void*)((*(esp+6)+*(esp+7)-1))))
+          f->eax = (uint32_t) sys_read((int) *(esp+5), (const void*) *(esp+6),
+                                (unsigned) *(esp+7));
+        else{
+          if(!is_valid_ptr((const void*)(*(esp+6)))){
+            //printf("read: esp %x \n", (esp));
+            //printf("read: esp + 6 %x \n", (esp + 6));
+            //printf("read: *(esp + 6) hex %s \n", (char *)*(esp + 6));
+            //printf("read: fd = *(esp + 5) %d \n", *(esp + 5));
+            //printf("READ: *(esp + 6) invalid \n");
+          }
+          if(!is_valid_ptr((const void*)((*(esp+6)+*(esp+7)-1)))){
+            //printf("READ: (*(esp+5)+*(esp+6)-1) invalid \n");
+          }
+          //printf("READ: Pointer found as invalid 2\n");
+          sys_exit(-1);
+        }
+      }else{
+        //printf("READ: Pointer found as invalid 1\n");
+        sys_exit(-1);
+      }
+      break;
+    }
+  case SYS_SEEK:
+    {
+      if(!is_valid_ptr((const void *)(esp + 4)))
+        sys_exit(-1);
+
+      if(!is_valid_ptr((const void *)(esp + 5)))
+        sys_exit(-1);
+
+      sys_seek((int)(*(esp+4)), (unsigned)(*(esp+5)));
+      break;
+    }
+  case SYS_TELL: /* This final system call doesn't seem to affect anything */
+    {
+      if(!is_valid_ptr((const void *)(esp + 1)))
+        sys_exit(-1);
+
+      f->eax = sys_tell((int)(*(esp + 1)));
+      break;
+    }
   case SYS_EXEC:
     {
       // Validate the pointer to the first argument on the stack
@@ -207,6 +251,14 @@ syscall_handler (struct intr_frame *f)
       f->eax = sys_filesize((int)(*(esp+1)));
       break;
     }
+  case SYS_CLOSE:
+  {
+    if(!is_valid_ptr((const void *)(esp + 1)))
+      sys_exit(-1);
+
+    sys_close((int)(*(esp+1)));
+    break;
+  }
 
   /* unhandled case */
   default:
@@ -416,6 +468,73 @@ int sys_write(int fd, const void *buffer, unsigned size) {
   return bytes_written;
 }
 
+int sys_read(int fd, const void *buffer, unsigned size)
+{
+  struct file_descriptor *fd_struct;
+  int bytes_written = 0;
+
+  lock_acquire(&filesys_lock);
+
+  if(fd == STDOUT_FILENO) {
+    lock_release(&filesys_lock);
+    return -1;
+  }
+
+  if(fd == STDIN_FILENO) {
+    uint8_t c;
+    unsigned counter = size;
+    uint8_t *buf = buffer;
+    while(counter > 1 && (c = input_getc()) != 0) {
+      *buf = c;
+      buffer++;
+      counter--;
+    }
+    *buf = 0;
+    lock_release(&filesys_lock);
+    return (size - counter);
+  }
+
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL)
+    bytes_written = file_read(fd_struct->file_struct, buffer, size);
+
+  lock_release(&filesys_lock);
+  return bytes_written;
+}
+
+void sys_seek(int fd, unsigned position)
+{
+  struct file_descriptor *fd_struct;
+  lock_acquire(&filesys_lock);
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL)
+    file_seek(fd_struct->file_struct, position);
+  lock_release(&filesys_lock);
+  return;
+}
+
+unsigned sys_tell(int fd)
+{
+  struct file_descriptor *fd_struct;
+  int bytes = 0;
+  lock_acquire(&filesys_lock);
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL)
+    bytes = file_tell(fd_struct->file_struct);
+  lock_release(&filesys_lock);
+  return bytes;
+}
+
+void sys_close(int fd)
+{
+  struct file_descriptor *fd_struct;
+  lock_acquire(&filesys_lock);
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL && fd_struct->owner == thread_current()->tid)
+    close_extra_files(fd);
+  lock_release(&filesys_lock);
+}
+
 struct file_descriptor *
 retrieve_file(int fd){
   struct list_elem *list_element;
@@ -432,6 +551,30 @@ retrieve_file(int fd){
     return fd_struct;
 
   return NULL;
+}
+
+void close_extra_files(int fd_num)
+{
+  struct list_elem *elem;
+  struct list_elem *temp;
+  struct file_descriptor *file_desc;
+
+  elem = list_head (&(thread_current()->open_files));
+  while ((elem = list_next (elem)) != list_tail (&(thread_current()
+      ->open_files)))
+  {
+    temp = list_prev(elem);
+    file_desc = list_entry(elem, struct file_descriptor, elem);
+    if (file_desc->fd_num == fd_num)
+    {
+      list_remove(elem);
+      file_close(file_desc->file_struct);
+      free(file_desc);
+      return;
+    }
+    elem = temp;
+  }
+  return;
 }
 
 void
