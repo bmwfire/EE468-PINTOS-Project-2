@@ -493,7 +493,7 @@ void sys_close(int fd)
   lock_acquire(&filesys_lock);
   fd_struct = retrieve_file(fd);
   if(fd_struct != NULL && fd_struct->owner == thread_current()->tid)
-    close_thread_files(fd);
+    close_extra_files(fd);
   lock_release(&filesys_lock);
 }
 
@@ -513,6 +513,29 @@ retrieve_file(int fd){
     return fd_struct;
 
   return NULL;
+}
+
+void close_extra_files(int fd_num)
+{
+  struct list_elem *elem;
+  struct list_elem *temp;
+  struct file_descriptor *file_desc;
+
+  elem = list_end (&(thread_current()->open_files));
+  while ((elem = list_prev (elem)) != list_head (&(thread_current()->open_files)))
+  {
+    temp = list_prev(elem);
+    file_desc = list_entry(elem, struct file_descriptor, elem);
+    if (file_desc->owner == fd_num)
+    {
+      list_remove(elem);
+      file_close(file_desc->file_struct);
+      free(file_desc);
+      return;
+    }
+    elem = temp;
+  }
+  return;
 }
 
 void
