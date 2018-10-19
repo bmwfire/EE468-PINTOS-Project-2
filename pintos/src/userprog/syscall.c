@@ -204,6 +204,7 @@ syscall_handler (struct intr_frame *f)
         sys_exit(-1);
 
       sys_seek((int)(*(esp+1)), (unsigned)(*(esp+2)));
+      break;
     }
   case SYS_EXEC:
     {
