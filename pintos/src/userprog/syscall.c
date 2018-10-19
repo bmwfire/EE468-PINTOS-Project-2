@@ -479,6 +479,11 @@ int sys_read(int fd, const void *buffer, unsigned size)
   return bytes_written;
 }
 
+void sys_close(int fd)
+{
+
+}
+
 struct file_descriptor *
 retrieve_file(int fd){
   struct list_elem *list_element;
