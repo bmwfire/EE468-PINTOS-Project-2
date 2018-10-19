@@ -204,10 +204,10 @@ syscall_handler (struct intr_frame *f)
     }
   case SYS_TELL:
     {
-      if(!is_valid_ptr((const void *)(esp + 5)))
+      if(!is_valid_ptr((const void *)(esp + 6)))
         sys_exit(-1);
 
-      f->eax = sys_tell((int)(*(esp+5)));
+      f->eax = sys_tell((int)(*(esp+6)));
       break;
     }
   case SYS_EXEC:
