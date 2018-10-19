@@ -416,6 +416,11 @@ int sys_write(int fd, const void *buffer, unsigned size) {
   return bytes_written;
 }
 
+int read(int fd, void *buffer, unsigned size)
+{
+
+}
+
 struct file_descriptor *
 retrieve_file(int fd){
   struct list_elem *list_element;
