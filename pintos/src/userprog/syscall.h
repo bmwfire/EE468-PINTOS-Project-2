@@ -2,6 +2,12 @@
 #define USERPROG_SYSCALL_H
 #include "userprog/process.h"
 
+static void syscall_handler (struct intr_frame *);
+void sys_exit (int);
+void sys_halt(void);
+int sys_exec (const char *cmdline);
+int sys_open(char * file);
+int sys_filesize(int fd_num);
 void syscall_init (void);
 int sys_write(int fd, const void *buffer, unsigned size);
 int sys_read(int fd, const void *buffer, unsigned size);

@@ -25,12 +25,6 @@
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 
-static void syscall_handler (struct intr_frame *);
-void sys_exit (int);
-void sys_halt(void);
-int sys_exec (const char *cmdline);
-int sys_open(char * file);
-int sys_filesize(int fd_num);
 
 struct lock filesys_lock;
 
