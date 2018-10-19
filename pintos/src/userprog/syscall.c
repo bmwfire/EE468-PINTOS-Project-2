@@ -202,12 +202,12 @@ syscall_handler (struct intr_frame *f)
       sys_seek((int)(*(esp+4)), (unsigned)(*(esp+5)));
       break;
     }
-  case SYS_TELL:
+  case SYS_TELL: /* This final system call doesn't seem to affect anything */
     {
-      if(!is_valid_ptr((const void *)(esp + 7)))
+      if(!is_valid_ptr((const void *)(esp + 1)))
         sys_exit(-1);
 
-      f->eax = sys_tell((int)(*(esp + 7)));
+      f->eax = sys_tell((int)(*(esp + 1)));
       break;
     }
   case SYS_EXEC:
