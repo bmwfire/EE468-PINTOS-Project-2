@@ -108,13 +108,16 @@ syscall_handler (struct intr_frame *f)
       if(!is_valid_ptr((const void*) (esp+4)))
         sys_exit(-1);
 
-      if(!is_valid_ptr((const void*) *(esp+4)))
+      if(!is_valid_ptr((const void*) *(esp+1)))
+        sys_exit(-1);
+
+      if(!is_valid_ptr((const void*) *(esp+2)))
         sys_exit(-1);
 
       //printf("SYSCALL: SYS_CREATE: filename: %s\n", *(esp+4));
 
       lock_acquire(&filesys_lock);
-      f->eax = filesys_create((const char*)*(esp+4), (off_t)*(esp+5));
+      f->eax = filesys_create((const char*)*(esp+1), (off_t)*(esp+2));
       lock_release(&filesys_lock);
 
       break;
@@ -124,7 +127,7 @@ syscall_handler (struct intr_frame *f)
       if(!is_valid_ptr((const void*) (esp+4)))
         sys_exit(-1);
 
-      if(!is_valid_ptr((const void*) *(esp+4)))
+      if(!is_valid_ptr((const void*) *(esp+1)))
         sys_exit(-1);
 
       //printf("SYSCALL: SYS_REMOVE: filename: %s\n", *(esp+1));
@@ -141,7 +144,8 @@ syscall_handler (struct intr_frame *f)
       {
         //printf("WRITE: size = %d\n", *(esp+7));
         if(is_valid_ptr((const void*)(*(esp+6))) && is_valid_ptr((const void*)((*(esp+6)+*(esp+7)-1))))
-          f->eax = (uint32_t) sys_write((int) *(esp+5), (const void*) *(esp+6), (unsigned) *(esp+7));
+          f->eax = (uint32_t) sys_write((int) *(esp+1), (const void*) *
+              (esp+2), (unsigned) *(esp+3));
         else{
           if(!is_valid_ptr((const void*)(*(esp+6)))){
             //printf("write: esp %x \n", (esp));
@@ -169,8 +173,8 @@ syscall_handler (struct intr_frame *f)
       {
         //printf("WRITE: size = %d\n", *(esp+7));
         if(is_valid_ptr((const void*)(*(esp+6))) && is_valid_ptr((const void*)((*(esp+6)+*(esp+7)-1))))
-          f->eax = (uint32_t) sys_read((int) *(esp+5), (const void*) *(esp+6),
-                                (unsigned) *(esp+7));
+          f->eax = (uint32_t) sys_read((int) *(esp+1), (const void*) *(esp+2),
+                                (unsigned) *(esp+3));
         else{
           if(!is_valid_ptr((const void*)(*(esp+6)))){
             //printf("read: esp %x \n", (esp));
