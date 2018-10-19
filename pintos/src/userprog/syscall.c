@@ -236,6 +236,14 @@ syscall_handler (struct intr_frame *f)
       f->eax = sys_filesize((int)(*(esp+1)));
       break;
     }
+  case SYS_CLOSE:
+  {
+    if(!is_valid_ptr((const void *)(esp + 1)))
+      sys_exit(-1);
+
+    sys_close((int)(*(esp+1)));
+    break;
+  }
 
   /* unhandled case */
   default:
