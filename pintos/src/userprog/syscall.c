@@ -195,6 +195,16 @@ syscall_handler (struct intr_frame *f)
       }
       break;
     }
+  case SYS_SEEK:
+    {
+      if(!is_valid_ptr((const void *)(esp + 1)))
+        sys_exit(-1);
+
+      if(!is_valid_ptr((const void *)(esp + 2)))
+        sys_exit(-1);
+
+      sys_seek((int)(*(esp+1)), (unsigned)(*(esp+2)));
+    }
   case SYS_EXEC:
     {
       // Validate the pointer to the first argument on the stack
@@ -485,6 +495,16 @@ int sys_read(int fd, const void *buffer, unsigned size)
 
   lock_release(&filesys_lock);
   return bytes_written;
+}
+
+void sys_seek(int fd, unsigned position)
+{
+  struct file_descriptor *fd_struct;
+  lock_acquire(&filesys_lock);
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL)
+    file_seek(fd_struct->file_struct, position);
+  lock_release(&filesys_lock);
 }
 
 void sys_close(int fd)
