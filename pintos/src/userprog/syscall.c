@@ -514,6 +514,7 @@ void sys_seek(int fd, unsigned position)
   if(fd_struct != NULL)
     file_seek(fd_struct->file_struct, position);
   lock_release(&filesys_lock);
+  return;
 }
 
 unsigned sys_tell(int fd)
