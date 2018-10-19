@@ -2,7 +2,7 @@
 #define USERPROG_SYSCALL_H
 #include "userprog/process.h"
 
-static void syscall_handler (struct intr_frame *);
+
 void sys_exit (int);
 void sys_halt(void);
 int sys_exec (const char *cmdline);
