@@ -521,12 +521,13 @@ void close_extra_files(int fd_num)
   struct list_elem *temp;
   struct file_descriptor *file_desc;
 
-  elem = list_end (&(thread_current()->open_files));
-  while ((elem = list_prev (elem)) != list_head (&(thread_current()->open_files)))
+  elem = list_head (&(thread_current()->open_files));
+  while ((elem = list_next (elem)) != list_tail (&(thread_current()
+      ->open_files)))
   {
     temp = list_prev(elem);
     file_desc = list_entry(elem, struct file_descriptor, elem);
-    if (file_desc->owner == fd_num)
+    if (file_desc->fd_num == fd_num)
     {
       list_remove(elem);
       file_close(file_desc->file_struct);
