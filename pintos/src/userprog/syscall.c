@@ -206,6 +206,14 @@ syscall_handler (struct intr_frame *f)
       sys_seek((int)(*(esp+1)), (unsigned)(*(esp+2)));
       break;
     }
+  case SYS_TELL:
+    {
+      if(!is_valid_ptr((const void *)(esp + 1)))
+        sys_exit(-1);
+
+      f->eax = sys_tell((int)(*(esp+1)));
+      break;
+    }
   case SYS_EXEC:
     {
       // Validate the pointer to the first argument on the stack
@@ -506,6 +514,18 @@ void sys_seek(int fd, unsigned position)
   if(fd_struct != NULL)
     file_seek(fd_struct->file_struct, position);
   lock_release(&filesys_lock);
+}
+
+unsigned sys_tell(int fd)
+{
+  struct file_descriptor *fd_struct;
+  int bytes = 0;
+  lock_acquire(&filesys_lock);
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL)
+    bytes = file_tell(fd_struct->file_struct);
+  lock_release(&filesys_lock);
+  return bytes;
 }
 
 void sys_close(int fd)
