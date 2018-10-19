@@ -166,6 +166,35 @@ syscall_handler (struct intr_frame *f)
       }
       break;
     }
+  case SYS_READ:
+    {
+      //printf("READ: starting syswrite with esp = %d\n", *esp);
+      if(is_valid_ptr((const void*)(esp+5)) && is_valid_ptr( (const void*) (esp+6)) && is_valid_ptr((const void*)(esp+7)))
+      {
+        //printf("WRITE: size = %d\n", *(esp+7));
+        if(is_valid_ptr((const void*)(*(esp+6))) && is_valid_ptr((const void*)((*(esp+6)+*(esp+7)-1))))
+          f->eax = (uint32_t) sys_read((int) *(esp+5), (const void*) *(esp+6),
+                                (unsigned) *(esp+7));
+        else{
+          if(!is_valid_ptr((const void*)(*(esp+6)))){
+            //printf("read: esp %x \n", (esp));
+            //printf("read: esp + 6 %x \n", (esp + 6));
+            //printf("read: *(esp + 6) hex %s \n", (char *)*(esp + 6));
+            //printf("read: fd = *(esp + 5) %d \n", *(esp + 5));
+            //printf("READ: *(esp + 6) invalid \n");
+          }
+          if(!is_valid_ptr((const void*)((*(esp+6)+*(esp+7)-1)))){
+            //printf("READ: (*(esp+5)+*(esp+6)-1) invalid \n");
+          }
+          //printf("READ: Pointer found as invalid 2\n");
+          sys_exit(-1);
+        }
+      }else{
+        //printf("READ: Pointer found as invalid 1\n");
+        sys_exit(-1);
+      }
+      break;
+    }
   case SYS_EXEC:
     {
       // Validate the pointer to the first argument on the stack
@@ -416,7 +445,7 @@ int sys_write(int fd, const void *buffer, unsigned size) {
   return bytes_written;
 }
 
-int sys_read(int fd, void *buffer, unsigned size)
+int sys_read(int fd, const void *buffer, unsigned size)
 {
   struct file_descriptor *fd_struct;
   int bytes_written = 0;
