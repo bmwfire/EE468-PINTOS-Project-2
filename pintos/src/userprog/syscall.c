@@ -416,9 +416,38 @@ int sys_write(int fd, const void *buffer, unsigned size) {
   return bytes_written;
 }
 
-int read(int fd, void *buffer, unsigned size)
+int sys_read(int fd, void *buffer, unsigned size)
 {
+  struct file_descriptor *fd_struct;
+  int bytes_written = 0;
 
+  lock_acquire(&filesys_lock);
+
+  if(fd == STDOUT_FILENO) {
+    lock_release(&filesys_lock);
+    return -1;
+  }
+
+  if(fd == STDIN_FILENO) {
+    uint8_f c;
+    unsigned counter = size;
+    uint8_t *buf = buffer;
+    while(counter > 1 && (c = input_getc()) != 0) {
+      *buf = c;
+      buffer++;
+      counter--;
+    }
+    *buf = 0;
+    lock_release(&filesys_lock);
+    return (size - counter);
+  }
+
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL)
+    bytes_written = file_read(fd_struct->file_struct, buffer, size);
+
+  lock_release(&filesys_lock);
+  return bytes_written;
 }
 
 struct file_descriptor *
