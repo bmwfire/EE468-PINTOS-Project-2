@@ -481,7 +481,12 @@ int sys_read(int fd, const void *buffer, unsigned size)
 
 void sys_close(int fd)
 {
-
+  struct file_descriptor *fd_struct;
+  lock_acquire(&filesys_lock);
+  fd_struct = retrieve_file(fd);
+  if(fd_struct != NULL && fd_struct->owner == thread_current()->tid)
+    close_thread_files(fd);
+  lock_release(&filesys_lock);
 }
 
 struct file_descriptor *
