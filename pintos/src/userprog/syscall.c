@@ -199,7 +199,7 @@ syscall_handler (struct intr_frame *f)
       if(!is_valid_ptr((const void *)(esp + 2)))
         sys_exit(-1);
 
-      sys_seek((int)(*(esp+1)), (unsigned)(*(esp+2)));
+      sys_seek((int)(*(esp+1)), 0);
       break;
     }
   case SYS_TELL:
