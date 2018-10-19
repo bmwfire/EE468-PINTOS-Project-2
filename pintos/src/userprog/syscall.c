@@ -458,7 +458,7 @@ int sys_read(int fd, const void *buffer, unsigned size)
   }
 
   if(fd == STDIN_FILENO) {
-    uint8_f c;
+    uint8_t c;
     unsigned counter = size;
     uint8_t *buf = buffer;
     while(counter > 1 && (c = input_getc()) != 0) {
