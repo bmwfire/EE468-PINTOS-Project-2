@@ -31,6 +31,7 @@ void sys_halt(void);
 int sys_exec (const char *cmdline);
 int sys_open(char * file);
 int sys_filesize(int fd_num);
+int allocate_fd_num();
 
 struct lock filesys_lock;
 
@@ -39,6 +40,8 @@ struct lock filesys_lock;
 bool is_valid_ptr(const void *user_ptr);
 
 struct lock filesys_lock;
+
+struct list open_files;
 
 struct file_descriptor * retrieve_file(int fd);
 
@@ -300,33 +303,56 @@ int sys_filesize(int fd_num)
  * */
 int sys_open(char * file_name)
 {
-  // obtain lock for filesystem since we are about to open the file
+//  // obtain lock for filesystem since we are about to open the file
+//  lock_acquire(&filesys_lock);
+//
+//  // open the file
+//  struct file * new_file_struct = filesys_open(file_name);
+//
+//  // file will be null if file not found in file system
+//  if (new_file_struct==NULL){
+//    // nothing to do here open fails, return -1
+//    //printf("sys_open: file not found in filesystem \n");
+//    lock_release(&filesys_lock);
+//    return -1;
+//  }
+//  // else add file to current threads list of open files
+//  // from pintos notes section 3.3.4 System calls: when a single file is opened more than once, whether by a single
+//  // process or different processes each open returns a new file descriptor. Different file descriptors for a single
+//  // file are closed independently in seperate calls to close and they do not share a file position. We should make a
+//  // list of files so if a single file is opened more than once we can close it without conflicts.
+//  struct file_descriptor * new_thread_file = malloc(sizeof(struct file_descriptor));
+//  new_thread_file->file_struct = new_file_struct;
+//  new_thread_file->fd_num = thread_current()->next_fd;
+//  new_thread_file->owner = thread_current()->tid;
+//  thread_current()->next_fd++;
+//  list_push_back(&thread_current()->open_files, &new_thread_file->elem);
+//  //printf("sys_open: file found in filesystem. new file_descriptor number: %d \n", new_thread_file->fd_num);
+//  lock_release(&filesys_lock);
+//  return new_thread_file->fd_num;
+  struct file *f;
+  struct file_descriptor *fd;
+  int status = -1;
+
   lock_acquire(&filesys_lock);
 
-  // open the file
-  struct file * new_file_struct = filesys_open(file_name);
-
-  // file will be null if file not found in file system
-  if (new_file_struct==NULL){
-    // nothing to do here open fails, return -1
-    //printf("sys_open: file not found in filesystem \n");
-    lock_release(&filesys_lock);
-    return -1;
+  f = filesys_open(file_name);
+  if(f != NULL) {
+    fd = calloc(1, sizeof *fd);
+    fd->fd_num = allocate_fd_num();
+    fd->owner = thread_current()->tid;
+    fd->file_struct = f;
+    list_push_back(&open_files, &fd->elem);
+    status = fd->fd_num;
   }
-  // else add file to current threads list of open files
-  // from pintos notes section 3.3.4 System calls: when a single file is opened more than once, whether by a single
-  // process or different processes each open returns a new file descriptor. Different file descriptors for a single
-  // file are closed independently in seperate calls to close and they do not share a file position. We should make a
-  // list of files so if a single file is opened more than once we can close it without conflicts.
-  struct file_descriptor * new_thread_file = malloc(sizeof(struct file_descriptor));
-  new_thread_file->file_struct = new_file_struct;
-  new_thread_file->fd_num = thread_current()->next_fd;
-  new_thread_file->owner = thread_current()->tid;
-  thread_current()->next_fd++;
-  list_push_back(&thread_current()->open_files, &new_thread_file->elem);
-  //printf("sys_open: file found in filesystem. new file_descriptor number: %d \n", new_thread_file->fd_num);
   lock_release(&filesys_lock);
-  return new_thread_file->fd_num;
+  return status;
+}
+
+int allocate_fd_num()
+{
+  static int fd_current = 1;
+  return ++fd_current;
 }
 
 int sys_exec (const char *cmdline){
